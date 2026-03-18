@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SHAMGAD VAALE BAJAJ</title>
+    <style>
+        body { background-color: #000; color: #fff; font-family: sans-serif; margin: 0; padding-bottom: 20px; }
+        #status-bar { padding: 10px; background: #111; font-size: 0.8rem; color: #666; text-align: center; border-bottom: 1px solid #222; position: sticky; top: 0; z-index: 100; display: flex; justify-content: space-between; align-items: center; }
+        #display-container { width: 100%; padding: 20px; text-align: right; box-sizing: border-box; min-height: 160px; display: flex; flex-direction: column; justify-content: flex-end; }
+        #running-calc { font-size: 1.2rem; color: #ff9f0a; margin-bottom: 5px; }
+        #main-display { font-size: 4.5rem; font-weight: bold; margin: 0; color: #fff; }
+        .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; width: 100%; padding: 10px; box-sizing: border-box; }
+        button { border: none; border-radius: 50%; height: 72px; width: 72px; font-size: 1.4rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; margin: auto; -webkit-tap-highlight-color: transparent; }
+        .num { background-color: #333; color: #fff; }
+        .op { background-color: #333; color: #ff9f0a; font-size: 2rem; }
+        .spec { background-color: #a5a5a5; color: #000; }
+        .eq { background-color: #ff9f0a; color: #fff; font-size: 2.2rem; }
+        .btn-net { background-color: #28a745; color: #fff; border-radius: 15px; font-size: 0.9rem; }
+        .btn-disc { background-color: #007aff; color: #fff; border-radius: 15px; font-size: 0.9rem; }
+        .btn-first { background-color: #555; color: #fff; border-radius: 15px; font-size: 0.9rem; }
+        #p-status { background-color: #ff3b30; color: #fff; font-size: 1.4rem; }
+        #p-status.connected { background-color: #28a745; }
+        .reset-btn { font-size: 0.6rem; color: #444; border: 1px solid #444; padding: 2px 5px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div id="status-bar">
+        <span>PRINTER: DISCONNECTED</span>
+        <div class="reset-btn" onclick="resetBill()">RESET BILL NO</div>
+    </div>
+    <div id="display-container">
+        <div id="running-calc">Total Items: 0</div>
+        <div id="main-display">0</div>
+    </div>
+    <div class="grid">
+        <button class="spec" onclick="clearAll()">AC</button>
+        <button class="btn-net" onclick="handlePrint('NET')">NET</button>
+        <button class="spec" onclick="backspace()">⌫</button>
+        <button class="op" onclick="setOp('*')">×</button>
+        <button class="num" onclick="press('7')">7</button>
+        <button class="num" onclick="press('8')">8</button>
+        <button class="num" onclick="press('9')">9</button>
+        <button class="op" onclick="setOp('-')">-</button>
+        <button class="num" onclick="press('4')">4</button>
+        <button class="num" onclick="press('5')">5</button>
+        <button class="num" onclick="press('6')">6</button>
+        <button class="op" onclick="setOp('+')">+</button>
+        <button class="num" onclick="press('1')">1</button>
+        <button class="num" onclick="press('2')">2</button>
+        <button class="num" onclick="press('3')">3</button>
+        <button class="btn-first" onclick="handlePrint('FIRST')">FIRST</button>
+        <button id="p-status" onclick="connectBT()">P</button>
+        <button class="num" onclick="press('0')">0</button>
+        <button class="eq" onclick="calculate()">=</button>
+        <button class="btn-disc" onclick="handlePrint('DISCOUNT')">DISC.</button>
+    </div>
+    <script>
+        let currentInput = ""; let items = []; let totalSoFar = 0; let lastOp = "+";
+        let btCharacteristic = null; let billNumber = parseInt(localStorage.getItem('shamgad_bill_no')) || 1;
+        function updateDisplay(val) { document.getElementById('main-display').innerText = val; document.getElementById('running-calc').innerText = "Total Items: " + items.length; }
+        function press(num) { currentInput += num; document.getElementById('main-display').innerText = currentInput; }
+        function setOp(op) { if (currentInput === "") { lastOp = op; return; } let val = parseFloat(currentInput); items.push(lastOp === '-' ? -val : val); totalSoFar = items.reduce((a, b) => a + b, 0); lastOp = op; currentInput = ""; updateDisplay(totalSoFar); }
+        function calculate() { if (currentInput !== "") { let val = parseFloat(currentInput); items.push(lastOp === '-' ? -val : val); currentInput = ""; } totalSoFar = items.reduce((a, b) => a + b, 0); updateDisplay(totalSoFar); lastOp = "+"; }
+        function backspace() { currentInput = currentInput.slice(0, -1); document.getElementById('main-display').innerText = currentInput || totalSoFar || "0"; }
+        function clearAll() { currentInput = ""; items = []; totalSoFar = 0; lastOp = "+"; updateDisplay("0"); }
+        function resetBill() { if(confirm("Start Bill No from 1?")) { billNumber = 1; localStorage.setItem('shamgad_bill_no', 1); alert("Reset successful!"); } }
+        async function connectBT() {
+            try {
+                const device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb', '0000ff00-0000-1000-8000-00805f9b34fb'] });
+                const server = await device.gatt.connect();
+                const services = await server.getPrimaryServices();
+                for (let service of services) {
+                    const chars = await service.getCharacteristics();
+                    btCharacteristic = chars.find(c => c.properties.write || c.properties.writeWithoutResponse);
+                    if (btCharacteristic) break;
+                }
+                if (btCharacteristic) { document.getElementById('p-status').classList.add('connected'); document.querySelector('#status-bar span').innerText = "PRINTER: READY"; }
+            } catch (e) { alert("Error: " + e.message); }
+        }
+        async function handlePrint(mode) {
+            calculate(); if (items.length === 0) return; if (!btCharacteristic) { alert("Connect Printer (Red P)"); return; }
+            const now = new Date(); const dateStr = now.toLocaleDateString('en-IN'); const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+            let finalTotal = items.reduce((a, b) => a + b, 0);
+            const ESC = '\x1B'; const GS = '\x1D'; const CENTER = ESC + 'a' + '\x01'; const LEFT = ESC + 'a' + '\x00';
+            const SIZE_LARGE = GS + '!' + '\x11'; const SIZE_NORMAL = GS + '!' + '\x00';
+            let text = CENTER;
+            if (mode !== 'DISCOUNT') {
+                text += SIZE_LARGE + "SHAMGAD VAALE\nBAJAJ\n" + SIZE_NORMAL;
+                text += `BILL NO: ${billNumber} | ${dateStr}\nTIME: ${timeStr}\nph: 9992664380\n--------------------------------\n`;
+                text += (mode === 'FIRST' ? "ESTIMATE" : "FINAL BILL") + "\n";
+            } else { text += SIZE_NORMAL + "AFTER DISCOUNT\n"; }
+            text += "--------------------------------\n" + LEFT + SIZE_LARGE;
+            items.forEach((p, i) => { text += `${i+1}: Rs ${Math.abs(p)}${p < 0 ? ' (Ret)' : ''}\n`; });
+            text += SIZE_NORMAL + "--------------------------------\n" + SIZE_LARGE + (mode === 'DISCOUNT' ? "NET: " : "TOTAL: ") + "Rs " + finalTotal + "\n" + SIZE_NORMAL;
+            if (mode === 'NET' || mode === 'DISCOUNT') { text += CENTER + "\nNO RETURN NO EXCHANGE\nTHANK YOU VISIT AGAIN\n\n\n\n"; } else { text += "\n\n\n"; }
+            const encoder = new TextEncoder(); const data = encoder.encode(text);
+            for (let i = 0; i < data.length; i += 20) { await btCharacteristic.writeValue(data.slice(i, i + 20)); }
+            billNumber++; localStorage.setItem('shamgad_bill_no', billNumber); clearAll();
+        }
+    </script>
+</body>
+</html>
