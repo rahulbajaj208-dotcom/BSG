@@ -3,45 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SHAMGAD VAALE BAJAJ</title>
+    <title>SHAMGAD VAALE</title>
     <style>
-        body { background-color: #000; color: #fff; font-family: sans-serif; margin: 0; padding-bottom: 20px; }
-        #status-bar { padding: 10px; background: #111; font-size: 0.8rem; color: #666; text-align: center; border-bottom: 1px solid #222; position: sticky; top: 0; z-index: 100; display: flex; justify-content: space-between; align-items: center; }
-        #display-container { width: 100%; padding: 20px; text-align: right; box-sizing: border-box; min-height: 160px; display: flex; flex-direction: column; justify-content: flex-end; }
-        #running-calc { font-size: 1.2rem; color: #ff9f0a; margin-bottom: 5px; }
-        #main-display { font-size: 4.5rem; font-weight: bold; margin: 0; color: #fff; }
-        .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; width: 100%; padding: 10px; box-sizing: border-box; }
-        button { border: none; border-radius: 50%; height: 72px; width: 72px; font-size: 1.4rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; margin: auto; -webkit-tap-highlight-color: transparent; }
-        .num { background-color: #333; color: #fff; }
-        .op { background-color: #333; color: #ff9f0a; font-size: 2rem; }
-        .spec { background-color: #a5a5a5; color: #000; }
-        .eq { background-color: #ff9f0a; color: #fff; font-size: 2.2rem; }
-        .btn-net { background-color: #28a745; color: #fff; border-radius: 15px; font-size: 0.9rem; }
-        .btn-disc { background-color: #007aff; color: #fff; border-radius: 15px; font-size: 0.9rem; }
-        .btn-first { background-color: #555; color: #fff; border-radius: 15px; font-size: 0.9rem; }
-        #p-status { background-color: #ff3b30; color: #fff; font-size: 1.4rem; }
-        #p-status.connected { background-color: #28a745; }
-        .reset-btn { font-size: 0.6rem; color: #444; border: 1px solid #444; padding: 2px 5px; border-radius: 4px; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html, body { position: fixed; top: 0; bottom: 0; left: 0; right: 0; margin: 0; padding: 0; background-color: #000; color: #fff; font-family: sans-serif; overflow: hidden; }
+        body { display: flex; flex-direction: column; }
+        #display-container { flex: 1; padding: 10px; display: flex; flex-direction: column; border-bottom: 2px solid #333; min-height: 0; }
+        .list-header { display: grid; grid-template-columns: 1fr 1fr; font-size: 0.8rem; color: #666; border-bottom: 1px solid #222; padding-bottom: 4px; margin-bottom: 4px; }
+        #items-area { flex: 1; overflow-y: auto; font-family: monospace; font-size: 1.1rem; }
+        .item-row { display: grid; grid-template-columns: 1fr 1fr; padding: 2px 0; }
+        .tag-val { color: #888; text-align: left; }
+        .disc-val { color: #fff; text-align: right; font-weight: bold; }
+        #main-display { font-size: 3.5rem; font-weight: bold; color: #fff; text-align: right; margin-top: auto; line-height: 1; }
+        .grid { flex: 0 0 55%; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(5, 1fr); gap: 5px; padding: 6px; background: #000; }
+        button { border: none; border-radius: 6px; font-size: 1.4rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .num { background-color: #2c2c2e; color: #fff; }
+        .op { background-color: #3a3a3c; color: #ff9f0a; }
+        .spec { background-color: #636366; color: #fff; }
+        .eq { background-color: #ff9f0a; color: #fff; }
+        .eq.saved { background-color: #34c759 !important; }
+        .btn-print { font-size: 0.9rem; }
+        .btn-net { background-color: #3a3a3c; color: #fff; }
+        .btn-disc { background-color: #007aff; color: #fff; }
+        #p-status { background-color: #ff3b30; color: #fff; border-radius: 50%; height: 42px; width: 42px; margin: auto; font-size: 0.9rem; }
+        #p-status.connected { background-color: #34c759; }
     </style>
 </head>
 <body>
-    <div id="status-bar">
-        <span>PRINTER: DISCONNECTED</span>
-        <div class="reset-btn" onclick="resetBill()">RESET BILL NO</div>
-    </div>
     <div id="display-container">
-        <div id="running-calc">Total Items: 0</div>
+        <div class="list-header"><span>TAG</span><span style="text-align: right;">DISC</span></div>
+        <div id="items-area"></div>
         <div id="main-display">0</div>
     </div>
     <div class="grid">
         <button class="spec" onclick="clearAll()">AC</button>
-        <button class="btn-net" onclick="handlePrint('NET')">NET</button>
         <button class="spec" onclick="backspace()">⌫</button>
+        <button class="op" onclick="setOp('%')">%</button>
         <button class="op" onclick="setOp('*')">×</button>
         <button class="num" onclick="press('7')">7</button>
         <button class="num" onclick="press('8')">8</button>
         <button class="num" onclick="press('9')">9</button>
-        <button class="op" onclick="setOp('-')">-</button>
+        <button class="op" onclick="setOp('-')">−</button>
         <button class="num" onclick="press('4')">4</button>
         <button class="num" onclick="press('5')">5</button>
         <button class="num" onclick="press('6')">6</button>
@@ -49,22 +51,56 @@
         <button class="num" onclick="press('1')">1</button>
         <button class="num" onclick="press('2')">2</button>
         <button class="num" onclick="press('3')">3</button>
-        <button class="btn-first" onclick="handlePrint('FIRST')">FIRST</button>
+        <button class="btn-print btn-net" onclick="handlePrint('NET')">NET</button>
         <button id="p-status" onclick="connectBT()">P</button>
         <button class="num" onclick="press('0')">0</button>
-        <button class="eq" onclick="calculate()">=</button>
-        <button class="btn-disc" onclick="handlePrint('DISCOUNT')">DISC.</button>
+        <button class="eq" id="eq-btn" onclick="calculate()">=</button>
+        <button class="btn-print btn-disc" onclick="handlePrint('DISC')">DISC</button>
     </div>
     <script>
-        let currentInput = ""; let items = []; let totalSoFar = 0; let lastOp = "+";
-        let btCharacteristic = null; let billNumber = parseInt(localStorage.getItem('shamgad_bill_no')) || 1;
-        function updateDisplay(val) { document.getElementById('main-display').innerText = val; document.getElementById('running-calc').innerText = "Total Items: " + items.length; }
+        let currentInput = ""; let tagItems = []; let discItems = [];
+        let isDiscPhase = false; let lastOp = "+"; let btCharacteristic = null;
+        let billNumber = parseInt(localStorage.getItem('shamgad_bill_no')) || 1;
+
+        function updateUI() {
+            const area = document.getElementById('items-area');
+            area.innerHTML = "";
+            const maxLen = Math.max(tagItems.length, discItems.length);
+            for(let i=0; i < maxLen; i++) {
+                area.innerHTML += `<div class="item-row"><div class="tag-val">${tagItems[i] || ''}</div><div class="disc-val">${discItems[i] || ''}</div></div>`;
+            }
+            area.scrollTop = area.scrollHeight;
+        }
+
         function press(num) { currentInput += num; document.getElementById('main-display').innerText = currentInput; }
-        function setOp(op) { if (currentInput === "") { lastOp = op; return; } let val = parseFloat(currentInput); items.push(lastOp === '-' ? -val : val); totalSoFar = items.reduce((a, b) => a + b, 0); lastOp = op; currentInput = ""; updateDisplay(totalSoFar); }
-        function calculate() { if (currentInput !== "") { let val = parseFloat(currentInput); items.push(lastOp === '-' ? -val : val); currentInput = ""; } totalSoFar = items.reduce((a, b) => a + b, 0); updateDisplay(totalSoFar); lastOp = "+"; }
-        function backspace() { currentInput = currentInput.slice(0, -1); document.getElementById('main-display').innerText = currentInput || totalSoFar || "0"; }
-        function clearAll() { currentInput = ""; items = []; totalSoFar = 0; lastOp = "+"; updateDisplay("0"); }
-        function resetBill() { if(confirm("Start Bill No from 1?")) { billNumber = 1; localStorage.setItem('shamgad_bill_no', 1); alert("Reset successful!"); } }
+
+        function processMath() {
+            if (currentInput === "") return;
+            let val = parseFloat(currentInput);
+            let targetList = isDiscPhase ? discItems : tagItems;
+            if (lastOp === '*') { let lastVal = targetList.pop() || 1; targetList.push(lastVal * val); }
+            else if (lastOp === '-') { targetList.push(-val); }
+            else if (lastOp === '%') { let lastVal = targetList.pop() || 0; targetList.push(Math.round(lastVal - (lastVal * (val/100)))); }
+            else { targetList.push(val); }
+            currentInput = "";
+        }
+
+        function setOp(op) { processMath(); lastOp = op; updateUI(); document.getElementById('main-display').innerText = "0"; }
+
+        function calculate() { 
+            processMath(); updateUI(); lastOp = "+";
+            document.getElementById('main-display').innerText = "0";
+            if(!isDiscPhase && tagItems.length > 0) { document.getElementById('eq-btn').classList.add('saved'); isDiscPhase = true; }
+        }
+
+        function backspace() { currentInput = currentInput.slice(0, -1); document.getElementById('main-display').innerText = currentInput || "0"; }
+
+        function clearAll() { 
+            currentInput = ""; tagItems = []; discItems = []; isDiscPhase = false; lastOp = "+";
+            document.getElementById('main-display').innerText = "0"; document.getElementById('eq-btn').classList.remove('saved');
+            updateUI();
+        }
+
         async function connectBT() {
             try {
                 const device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb', '0000ff00-0000-1000-8000-00805f9b34fb'] });
@@ -75,28 +111,43 @@
                     btCharacteristic = chars.find(c => c.properties.write || c.properties.writeWithoutResponse);
                     if (btCharacteristic) break;
                 }
-                if (btCharacteristic) { document.getElementById('p-status').classList.add('connected'); document.querySelector('#status-bar span').innerText = "PRINTER: READY"; }
-            } catch (e) { alert("Error: " + e.message); }
+                if (btCharacteristic) document.getElementById('p-status').classList.add('connected');
+            } catch (e) { alert(e.message); }
         }
+
         async function handlePrint(mode) {
-            calculate(); if (items.length === 0) return; if (!btCharacteristic) { alert("Connect Printer (Red P)"); return; }
-            const now = new Date(); const dateStr = now.toLocaleDateString('en-IN'); const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-            let finalTotal = items.reduce((a, b) => a + b, 0);
-            const ESC = '\x1B'; const GS = '\x1D'; const CENTER = ESC + 'a' + '\x01'; const LEFT = ESC + 'a' + '\x00';
-            const SIZE_LARGE = GS + '!' + '\x11'; const SIZE_NORMAL = GS + '!' + '\x00';
-            let text = CENTER;
-            if (mode !== 'DISCOUNT') {
-                text += SIZE_LARGE + "SHAMGAD VAALE\nBAJAJ\n" + SIZE_NORMAL;
-                text += `BILL NO: ${billNumber} | ${dateStr}\nTIME: ${timeStr}\nph: 9992664380\n--------------------------------\n`;
-                text += (mode === 'FIRST' ? "ESTIMATE" : "FINAL BILL") + "\n";
-            } else { text += SIZE_NORMAL + "AFTER DISCOUNT\n"; }
-            text += "--------------------------------\n" + LEFT + SIZE_LARGE;
-            items.forEach((p, i) => { text += `${i+1}: Rs ${Math.abs(p)}${p < 0 ? ' (Ret)' : ''}\n`; });
-            text += SIZE_NORMAL + "--------------------------------\n" + SIZE_LARGE + (mode === 'DISCOUNT' ? "NET: " : "TOTAL: ") + "Rs " + finalTotal + "\n" + SIZE_NORMAL;
-            if (mode === 'NET' || mode === 'DISCOUNT') { text += CENTER + "\nNO RETURN NO EXCHANGE\nTHANK YOU VISIT AGAIN\n\n\n\n"; } else { text += "\n\n\n"; }
-            const encoder = new TextEncoder(); const data = encoder.encode(text);
+            if (currentInput !== "") calculate();
+            if (!btCharacteristic) { alert("Connect Printer"); return; }
+            const ESC = '\x1B'; const GS = '\x1D';
+            const CENTER = ESC + 'a' + '\x01'; const LEFT = ESC + 'a' + '\x00';
+            const SIZE_L = GS + '!' + '\x11'; const SIZE_N = GS + '!' + '\x00';
+
+            let text = CENTER + SIZE_L + "SHAMGAD VAALE\nBAJAJ\n" + SIZE_N;
+            text += `BILL NO: ${billNumber} | ${new Date().toLocaleDateString('en-IN')}\n--------------------------------\n` + LEFT + SIZE_L;
+
+            if (mode === 'DISC') {
+                const max = Math.max(tagItems.length, discItems.length);
+                for(let i=0; i<max; i++) { 
+                    let lineNum = (i+1) + ": ";
+                    let tVal = String(tagItems[i] || 0);
+                    let dVal = String(discItems[i] || 0);
+                    // FIXED: Simple hyphen and no extra spaces to prevent wrapping
+                    text += lineNum + tVal + "-" + dVal + "\n";
+                }
+                let t1 = tagItems.reduce((a, b) => a + b, 0);
+                let t2 = discItems.reduce((a, b) => a + b, 0);
+                text += SIZE_N + "--------------------------------\n" + SIZE_L;
+                text += `${t1}-${t2}\n` + `NET: ${t2}\n`;
+            } else {
+                tagItems.forEach((p, i) => { text += `${i+1}: ${p}\n`; });
+                text += SIZE_N + "--------------------------------\n" + SIZE_L + `NET: ${tagItems.reduce((a, b) => a + b, 0)}\n`;
+            }
+
+            text += SIZE_N + CENTER + "--------------------------------\nNO RETURN NO EXCHANGE\nTHANK YOU VISIT AGAIN\n\n\n\n\n";
+            const data = new TextEncoder().encode(text);
             for (let i = 0; i < data.length; i += 20) { await btCharacteristic.writeValue(data.slice(i, i + 20)); }
-            billNumber++; localStorage.setItem('shamgad_bill_no', billNumber); clearAll();
+            billNumber++; localStorage.setItem('shamgad_bill_no', billNumber);
+            clearAll();
         }
     </script>
 </body>
