@@ -5,16 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SHAMGAD VAALE</title>
     <style>
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
         html, body { position: fixed; top: 0; bottom: 0; left: 0; right: 0; margin: 0; padding: 0; background-color: #000; color: #fff; font-family: sans-serif; overflow: hidden; }
         body { display: flex; flex-direction: column; }
-        #display-container { flex: 1; padding: 10px; display: flex; flex-direction: column; border-bottom: 2px solid #333; min-height: 0; }
-        .list-header { display: grid; grid-template-columns: 1fr 1fr; font-size: 0.8rem; color: #666; border-bottom: 1px solid #222; padding-bottom: 4px; margin-bottom: 4px; }
-        #items-area { flex: 1; overflow-y: auto; font-family: monospace; font-size: 1.1rem; }
-        .item-row { display: grid; grid-template-columns: 1fr 1fr; padding: 2px 0; }
+        
+        #display-container { flex: 1; padding: 8px; display: flex; flex-direction: column; border-bottom: 2px solid #333; min-height: 0; }
+        .list-header { display: grid; grid-template-columns: 1fr 1fr; font-size: 0.75rem; color: #666; border-bottom: 1px solid #222; padding-bottom: 2px; }
+        #items-area { flex: 1; overflow-y: auto; font-family: monospace; font-size: 1.1rem; margin-bottom: 5px; }
+        .item-row { display: grid; grid-template-columns: 1fr 1fr; padding: 2px 0; border-bottom: 1px solid #111; }
         .tag-val { color: #888; text-align: left; }
         .disc-val { color: #fff; text-align: right; font-weight: bold; }
-        #main-display { font-size: 3.5rem; font-weight: bold; color: #fff; text-align: right; margin-top: auto; line-height: 1; }
+        
+        /* NEW: Live Total Summary on Screen */
+        #live-summary { display: flex; justify-content: space-between; font-size: 0.9rem; color: #ff9f0a; padding: 4px 0; border-top: 1px solid #333; font-weight: bold; }
+        #main-display { font-size: 3.2rem; font-weight: bold; color: #fff; text-align: right; line-height: 1; margin-top: 2px; }
+
         .grid { flex: 0 0 55%; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(5, 1fr); gap: 5px; padding: 6px; background: #000; }
         button { border: none; border-radius: 6px; font-size: 1.4rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         .num { background-color: #2c2c2e; color: #fff; }
@@ -22,19 +27,24 @@
         .spec { background-color: #636366; color: #fff; }
         .eq { background-color: #ff9f0a; color: #fff; }
         .eq.saved { background-color: #34c759 !important; }
-        .btn-print { font-size: 0.9rem; }
+        .btn-print { font-size: 0.85rem; }
         .btn-net { background-color: #3a3a3c; color: #fff; }
         .btn-disc { background-color: #007aff; color: #fff; }
-        #p-status { background-color: #ff3b30; color: #fff; border-radius: 50%; height: 42px; width: 42px; margin: auto; font-size: 0.9rem; }
+        #p-status { background-color: #ff3b30; color: #fff; border-radius: 50%; height: 42px; width: 42px; margin: auto; font-size: 0.8rem; }
         #p-status.connected { background-color: #34c759; }
     </style>
 </head>
 <body>
     <div id="display-container">
-        <div class="list-header"><span>TAG</span><span style="text-align: right;">DISC</span></div>
+        <div class="list-header"><span>TAG ITEMS</span><span style="text-align: right;">DISCOUNTED</span></div>
         <div id="items-area"></div>
+        <div id="live-summary">
+            <span id="screen-tag-total">TAG: 0</span>
+            <span id="screen-disc-total">DISC: 0</span>
+        </div>
         <div id="main-display">0</div>
     </div>
+
     <div class="grid">
         <button class="spec" onclick="clearAll()">AC</button>
         <button class="spec" onclick="backspace()">⌫</button>
@@ -57,6 +67,7 @@
         <button class="eq" id="eq-btn" onclick="calculate()">=</button>
         <button class="btn-print btn-disc" onclick="handlePrint('DISC')">DISC</button>
     </div>
+
     <script>
         let currentInput = ""; let tagItems = []; let discItems = [];
         let isDiscPhase = false; let lastOp = "+"; let btCharacteristic = null;
@@ -69,6 +80,13 @@
             for(let i=0; i < maxLen; i++) {
                 area.innerHTML += `<div class="item-row"><div class="tag-val">${tagItems[i] || ''}</div><div class="disc-val">${discItems[i] || ''}</div></div>`;
             }
+            
+            // Calculate Screen Totals
+            const tagSum = tagItems.reduce((a, b) => a + b, 0);
+            const discSum = discItems.reduce((a, b) => a + b, 0);
+            document.getElementById('screen-tag-total').innerText = "TAG: " + tagSum;
+            document.getElementById('screen-disc-total').innerText = "DISC: " + discSum;
+            
             area.scrollTop = area.scrollHeight;
         }
 
@@ -90,14 +108,18 @@
         function calculate() { 
             processMath(); updateUI(); lastOp = "+";
             document.getElementById('main-display').innerText = "0";
-            if(!isDiscPhase && tagItems.length > 0) { document.getElementById('eq-btn').classList.add('saved'); isDiscPhase = true; }
+            if(!isDiscPhase && tagItems.length > 0) {
+                document.getElementById('eq-btn').classList.add('saved');
+                isDiscPhase = true;
+            }
         }
 
         function backspace() { currentInput = currentInput.slice(0, -1); document.getElementById('main-display').innerText = currentInput || "0"; }
 
         function clearAll() { 
             currentInput = ""; tagItems = []; discItems = []; isDiscPhase = false; lastOp = "+";
-            document.getElementById('main-display').innerText = "0"; document.getElementById('eq-btn').classList.remove('saved');
+            document.getElementById('main-display').innerText = "0";
+            document.getElementById('eq-btn').classList.remove('saved');
             updateUI();
         }
 
@@ -128,11 +150,7 @@
             if (mode === 'DISC') {
                 const max = Math.max(tagItems.length, discItems.length);
                 for(let i=0; i<max; i++) { 
-                    let lineNum = (i+1) + ": ";
-                    let tVal = String(tagItems[i] || 0);
-                    let dVal = String(discItems[i] || 0);
-                    // FIXED: Simple hyphen and no extra spaces to prevent wrapping
-                    text += lineNum + tVal + "-" + dVal + "\n";
+                    text += (i+1) + ": " + (tagItems[i] || 0) + "-" + (discItems[i] || 0) + "\n";
                 }
                 let t1 = tagItems.reduce((a, b) => a + b, 0);
                 let t2 = discItems.reduce((a, b) => a + b, 0);
