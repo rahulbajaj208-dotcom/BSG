@@ -16,7 +16,7 @@
         .tag-val { color: #888; text-align: left; }
         .disc-val { color: #fff; text-align: right; font-weight: bold; }
         
-        /* NEW: Live Total Summary on Screen */
+        /* Live Total Summary on Screen */
         #live-summary { display: flex; justify-content: space-between; font-size: 0.9rem; color: #ff9f0a; padding: 4px 0; border-top: 1px solid #333; font-weight: bold; }
         #main-display { font-size: 3.2rem; font-weight: bold; color: #fff; text-align: right; line-height: 1; margin-top: 2px; }
 
@@ -73,6 +73,31 @@
         let isDiscPhase = false; let lastOp = "+"; let btCharacteristic = null;
         let billNumber = parseInt(localStorage.getItem('shamgad_bill_no')) || 1;
 
+        // Number to Words Converter
+        function numberToWords(num) {
+            const a = ['','ONE ','TWO ','THREE ','FOUR ', 'FIVE ','SIX ','SEVEN ','EIGHT ','NINE ','TEN ','ELEVEN ','TWELVE ','THIRTEEN ','FOURTEEN ','FIFTEEN ','SIXTEEN ','SEVENTEEN ','EIGHTEEN ','NINETEEN '];
+            const b = ['', '', 'TWENTY ','THIRTY ','FORTY ','FIFTY ', 'SIXTY ','SEVENTY ','EIGHTY ','NINETY '];
+            
+            if (num === 0) return 'ZERO ONLY';
+            if (num > 99999) return num.toString(); 
+            
+            let str = '';
+            if (Math.floor(num / 1000) > 0) {
+                let thousands = Math.floor(num / 1000);
+                str += (thousands < 20) ? a[thousands] : b[Math.floor(thousands / 10)] + a[thousands % 10];
+                str += 'THOUSAND ';
+                num %= 1000;
+            }
+            if (Math.floor(num / 100) > 0) {
+                str += a[Math.floor(num / 100)] + 'HUNDRED ';
+                num %= 100;
+            }
+            if (num > 0) {
+                str += (num < 20) ? a[num] : b[Math.floor(num / 10)] + a[num % 10];
+            }
+            return str.trim() + ' ONLY';
+        }
+
         function updateUI() {
             const area = document.getElementById('items-area');
             area.innerHTML = "";
@@ -81,7 +106,6 @@
                 area.innerHTML += `<div class="item-row"><div class="tag-val">${tagItems[i] || ''}</div><div class="disc-val">${discItems[i] || ''}</div></div>`;
             }
             
-            // Calculate Screen Totals
             const tagSum = tagItems.reduce((a, b) => a + b, 0);
             const discSum = discItems.reduce((a, b) => a + b, 0);
             document.getElementById('screen-tag-total').innerText = "TAG: " + tagSum;
@@ -150,15 +174,39 @@
             if (mode === 'DISC') {
                 const max = Math.max(tagItems.length, discItems.length);
                 for(let i=0; i<max; i++) { 
-                    text += (i+1) + ": " + (tagItems[i] || 0) + "-" + (discItems[i] || 0) + "\n";
+                    // Pad index to 2 spaces, and values to 5 spaces
+                    let idx = String(i+1).padStart(2, ' ');
+                    let tVal = String(tagItems[i] || 0).padStart(5, ' ');
+                    let dVal = String(discItems[i] || 0).padStart(5, ' ');
+                    text += `${idx}: ${tVal}-${dVal}\n`;
                 }
+                
                 let t1 = tagItems.reduce((a, b) => a + b, 0);
                 let t2 = discItems.reduce((a, b) => a + b, 0);
+                
                 text += SIZE_N + "--------------------------------\n" + SIZE_L;
-                text += `${t1}-${t2}\n` + `NET: ${t2}\n`;
+                
+                // Align the totals block under the numbers
+                let t1Pad = String(t1).padStart(5, ' ');
+                let t2Pad = String(t2).padStart(5, ' ');
+                text += `    ${t1Pad}-${t2Pad}\n`;
+                
+                // Print NET in words
+                text += `NET: ${numberToWords(t2)}\n`;
+                
             } else {
-                tagItems.forEach((p, i) => { text += `${i+1}: ${p}\n`; });
-                text += SIZE_N + "--------------------------------\n" + SIZE_L + `NET: ${tagItems.reduce((a, b) => a + b, 0)}\n`;
+                tagItems.forEach((p, i) => { 
+                    let idx = String(i+1).padStart(2, ' ');
+                    let pVal = String(p).padStart(5, ' ');
+                    text += `${idx}: ${pVal}\n`; 
+                });
+                
+                let netTotal = tagItems.reduce((a, b) => a + b, 0);
+                let netTotalPad = String(netTotal).padStart(5, ' ');
+                
+                text += SIZE_N + "--------------------------------\n" + SIZE_L;
+                text += `    ${netTotalPad}\n`;
+                text += `NET: ${numberToWords(netTotal)}\n`;
             }
 
             text += SIZE_N + CENTER + "--------------------------------\nNO RETURN NO EXCHANGE\nTHANK YOU VISIT AGAIN\n\n\n\n\n";
@@ -170,3 +218,5 @@
     </script>
 </body>
 </html>
+
+```
