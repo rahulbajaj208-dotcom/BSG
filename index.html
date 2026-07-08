@@ -8,14 +8,18 @@
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
         html, body { position: fixed; top: 0; bottom: 0; left: 0; right: 0; margin: 0; padding: 0; background-color: #000; color: #fff; font-family: sans-serif; overflow: hidden; }
         body { display: flex; flex-direction: column; }
+        
         #display-container { flex: 1; padding: 8px; display: flex; flex-direction: column; border-bottom: 2px solid #333; min-height: 0; }
         .list-header { display: grid; grid-template-columns: 1fr 1fr; font-size: 0.75rem; color: #666; border-bottom: 1px solid #222; padding-bottom: 2px; }
         #items-area { flex: 1; overflow-y: auto; font-family: monospace; font-size: 1.1rem; margin-bottom: 5px; }
         .item-row { display: grid; grid-template-columns: 1fr 1fr; padding: 2px 0; border-bottom: 1px solid #111; }
         .tag-val { color: #888; text-align: left; }
         .disc-val { color: #fff; text-align: right; font-weight: bold; }
+        
+        /* Live Total Summary on Screen */
         #live-summary { display: flex; justify-content: space-between; font-size: 0.9rem; color: #ff9f0a; padding: 4px 0; border-top: 1px solid #333; font-weight: bold; }
         #main-display { font-size: 3.2rem; font-weight: bold; color: #fff; text-align: right; line-height: 1; margin-top: 2px; }
+
         .grid { flex: 0 0 55%; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(5, 1fr); gap: 5px; padding: 6px; background: #000; }
         button { border: none; border-radius: 6px; font-size: 1.4rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         .num { background-color: #2c2c2e; color: #fff; }
@@ -28,28 +32,9 @@
         .btn-disc { background-color: #007aff; color: #fff; }
         #p-status { background-color: #ff3b30; color: #fff; border-radius: 50%; height: 42px; width: 42px; margin: auto; font-size: 0.8rem; }
         #p-status.connected { background-color: #34c759; }
-        .popup-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-        .popup-content { background: #1c1c1e; padding: 25px; border-radius: 12px; text-align: center; width: 90%; max-width: 420px; border: 1px solid #333; }
-        .salesman-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 15px; }
-        .salesman-btn { padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
-    <div id="salesman-popup" class="popup-overlay" style="display: none;">
-        <div class="popup-content">
-            <h2 style="margin-top: 0; color: white;">ATTENDED BY</h2>
-            <div id="salesman-grid" class="salesman-grid"></div>
-        </div>
-    </div>
-    <div id="payment-popup" class="popup-overlay" style="display: none;">
-        <div class="popup-content">
-            <h2 style="color: white;">Payment Received?</h2>
-            <div style="display:flex; gap:10px;">
-                <button style="flex:1; padding:15px;" onclick="finalizeBill()">YES</button>
-                <button style="flex:1; padding:15px;" onclick="document.getElementById('payment-popup').style.display='none'">NO</button>
-            </div>
-        </div>
-    </div>
     <div id="display-container">
         <div class="list-header"><span>TAG ITEMS</span><span style="text-align: right;">DISCOUNTED</span></div>
         <div id="items-area"></div>
@@ -59,8 +44,9 @@
         </div>
         <div id="main-display">0</div>
     </div>
+
     <div class="grid">
-        <button class="spec" onclick="acButtonLogic()">AC</button>
+        <button class="spec" onclick="clearAll()">AC</button>
         <button class="spec" onclick="backspace()">⌫</button>
         <button class="op" onclick="setOp('%')">%</button>
         <button class="op" onclick="setOp('*')">×</button>
@@ -75,68 +61,162 @@
         <button class="num" onclick="press('1')">1</button>
         <button class="num" onclick="press('2')">2</button>
         <button class="num" onclick="press('3')">3</button>
-        <button class="btn-print btn-net" onclick="requestSalesman('NET')">NET</button>
+        <button class="btn-print btn-net" onclick="handlePrint('NET')">NET</button>
         <button id="p-status" onclick="connectBT()">P</button>
         <button class="num" onclick="press('0')">0</button>
         <button class="eq" id="eq-btn" onclick="calculate()">=</button>
-        <button class="btn-print btn-disc" onclick="requestSalesman('DISC')">DISC</button>
-        <button class="btn-print" onclick="copyHistory()">HIST</button>
+        <button class="btn-print btn-disc" onclick="handlePrint('DISC')">DISC</button>
     </div>
+
     <script>
-        let currentInput = "", tagItems = [], discItems = [], isDiscPhase = false, lastOp = "+", btCharacteristic = null, pendingMode = null;
+        let currentInput = ""; let tagItems = []; let discItems = [];
+        let isDiscPhase = false; let lastOp = "+"; let btCharacteristic = null;
         let billNumber = parseInt(localStorage.getItem('shamgad_bill_no')) || 1;
-        const staff = ["Rahul", "Suresh", "Rajesh", "Gulab", "Himakshi", "Mehak", "Other"];
-        const grid = document.getElementById("salesman-grid");
-        staff.forEach(name => {
-            let b = document.createElement("button"); b.className = "salesman-btn"; b.innerText = name;
-            b.onclick = () => finalizePrint(name); grid.appendChild(b);
-        });
-        function updateUI() {
-            const area = document.getElementById('items-area'); area.innerHTML = "";
-            let tS = 0, dS = 0;
-            for(let i=0; i < Math.max(tagItems.length, discItems.length); i++) {
-                let t = tagItems[i] || 0, d = (discItems[i] !== undefined) ? discItems[i] : t;
-                area.innerHTML += `<div class="item-row"><div class="tag-val">${t}</div><div class="disc-val">${d}</div></div>`;
-                tS += t; dS += d;
+
+        // Number to Words Converter
+        function numberToWords(num) {
+            const a = ['','ONE ','TWO ','THREE ','FOUR ', 'FIVE ','SIX ','SEVEN ','EIGHT ','NINE ','TEN ','ELEVEN ','TWELVE ','THIRTEEN ','FOURTEEN ','FIFTEEN ','SIXTEEN ','SEVENTEEN ','EIGHTEEN ','NINETEEN '];
+            const b = ['', '', 'TWENTY ','THIRTY ','FORTY ','FIFTY ', 'SIXTY ','SEVENTY ','EIGHTY ','NINETY '];
+            
+            if (num === 0) return 'ZERO ONLY';
+            if (num > 99999) return num.toString(); 
+            
+            let str = '';
+            if (Math.floor(num / 1000) > 0) {
+                let thousands = Math.floor(num / 1000);
+                str += (thousands < 20) ? a[thousands] : b[Math.floor(thousands / 10)] + a[thousands % 10];
+                str += 'THOUSAND ';
+                num %= 1000;
             }
-            document.getElementById('screen-tag-total').innerText = "TAG: " + tS;
-            document.getElementById('screen-disc-total').innerText = "DISC: " + dS;
+            if (Math.floor(num / 100) > 0) {
+                str += a[Math.floor(num / 100)] + 'HUNDRED ';
+                num %= 100;
+            }
+            if (num > 0) {
+                str += (num < 20) ? a[num] : b[Math.floor(num / 10)] + a[num % 10];
+            }
+            return str.trim() + ' ONLY';
         }
-        function press(n) { currentInput += n; document.getElementById('main-display').innerText = currentInput; }
-        function backspace() { currentInput = currentInput.slice(0, -1); document.getElementById('main-display').innerText = currentInput || "0"; }
+
+        function updateUI() {
+            const area = document.getElementById('items-area');
+            area.innerHTML = "";
+            const maxLen = Math.max(tagItems.length, discItems.length);
+            for(let i=0; i < maxLen; i++) {
+                area.innerHTML += `<div class="item-row"><div class="tag-val">${tagItems[i] || ''}</div><div class="disc-val">${discItems[i] || ''}</div></div>`;
+            }
+            
+            const tagSum = tagItems.reduce((a, b) => a + b, 0);
+            const discSum = discItems.reduce((a, b) => a + b, 0);
+            document.getElementById('screen-tag-total').innerText = "TAG: " + tagSum;
+            document.getElementById('screen-disc-total').innerText = "DISC: " + discSum;
+            
+            area.scrollTop = area.scrollHeight;
+        }
+
+        function press(num) { currentInput += num; document.getElementById('main-display').innerText = currentInput; }
+
         function processMath() {
             if (currentInput === "") return;
-            let v = parseFloat(currentInput);
-            if (isDiscPhase) { let t = tagItems[discItems.length] || 0; discItems.push(lastOp === '%' ? Math.round(t - (t * (v/100))) : v); } 
-            else tagItems.push(v);
+            let val = parseFloat(currentInput);
+            let targetList = isDiscPhase ? discItems : tagItems;
+            if (lastOp === '*') { let lastVal = targetList.pop() || 1; targetList.push(lastVal * val); }
+            else if (lastOp === '-') { targetList.push(-val); }
+            else if (lastOp === '%') { let lastVal = targetList.pop() || 0; targetList.push(Math.round(lastVal - (lastVal * (val/100)))); }
+            else { targetList.push(val); }
             currentInput = "";
         }
+
         function setOp(op) { processMath(); lastOp = op; updateUI(); document.getElementById('main-display').innerText = "0"; }
-        function calculate() { processMath(); updateUI(); lastOp = "+"; document.getElementById('main-display').innerText = "0"; if(!isDiscPhase && tagItems.length > 0) { isDiscPhase = true; document.getElementById('eq-btn').classList.add('saved'); } }
-        function acButtonLogic() { if(tagItems.length > 0) document.getElementById('payment-popup').style.display = 'flex'; else clearAll(); }
-        function finalizeBill() { clearAll(); document.getElementById('payment-popup').style.display = 'none'; }
-        function clearAll() { currentInput = ""; tagItems = []; discItems = []; isDiscPhase = false; document.getElementById('main-display').innerText = "0"; document.getElementById('eq-btn').classList.remove('saved'); updateUI(); }
-        function requestSalesman(m) { pendingMode = m; document.getElementById("salesman-popup").style.display = "flex"; }
-        async function connectBT() { try { const d = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb'] }); const s = await d.gatt.connect(); const c = await s.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb').then(srv => srv.getCharacteristics()); btCharacteristic = c.find(ch => ch.properties.write || ch.properties.writeWithoutResponse); if(btCharacteristic) document.getElementById('p-status').classList.add('connected'); } catch(e) { alert(e.message); } }
-        async function finalizePrint(salesman) {
-            document.getElementById("salesman-popup").style.display = "none";
+
+        function calculate() { 
+            processMath(); updateUI(); lastOp = "+";
+            document.getElementById('main-display').innerText = "0";
+            if(!isDiscPhase && tagItems.length > 0) {
+                document.getElementById('eq-btn').classList.add('saved');
+                isDiscPhase = true;
+            }
+        }
+
+        function backspace() { currentInput = currentInput.slice(0, -1); document.getElementById('main-display').innerText = currentInput || "0"; }
+
+        function clearAll() { 
+            currentInput = ""; tagItems = []; discItems = []; isDiscPhase = false; lastOp = "+";
+            document.getElementById('main-display').innerText = "0";
+            document.getElementById('eq-btn').classList.remove('saved');
+            updateUI();
+        }
+
+        async function connectBT() {
+            try {
+                const device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb', '0000ff00-0000-1000-8000-00805f9b34fb'] });
+                const server = await device.gatt.connect();
+                const services = await server.getPrimaryServices();
+                for (let service of services) {
+                    const chars = await service.getCharacteristics();
+                    btCharacteristic = chars.find(c => c.properties.write || c.properties.writeWithoutResponse);
+                    if (btCharacteristic) break;
+                }
+                if (btCharacteristic) document.getElementById('p-status').classList.add('connected');
+            } catch (e) { alert(e.message); }
+        }
+
+        async function handlePrint(mode) {
             if (currentInput !== "") calculate();
             if (!btCharacteristic) { alert("Connect Printer"); return; }
-            const ESC = '\x1B', GS = '\x1D', CENTER = ESC + 'a' + '\x01', LEFT = ESC + 'a' + '\x00', SIZE_L = GS + '!' + '\x11', SIZE_N = GS + '!' + '\x00';
-            const now = new Date();
-            let text = CENTER + SIZE_L + "SHAMGAD VAALE\nBAJAJ\n" + SIZE_N + `BILL NO: ${billNumber}\n${now.toLocaleDateString('en-IN')} ${now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}\nATTENDED BY: ${salesman}\n--------------------------------\n` + LEFT + SIZE_L;
-            let fSum = 0;
-            for(let i=0; i<tagItems.length; i++) {
-                let d = (discItems[i] !== undefined) ? discItems[i] : tagItems[i];
-                text += `${tagItems[i]} - ${d}\n`; fSum += d;
+            const ESC = '\x1B'; const GS = '\x1D';
+            const CENTER = ESC + 'a' + '\x01'; const LEFT = ESC + 'a' + '\x00';
+            const SIZE_L = GS + '!' + '\x11'; const SIZE_N = GS + '!' + '\x00';
+
+            let text = CENTER + SIZE_L + "SHAMGAD VAALE\nBAJAJ\n" + SIZE_N;
+            text += `BILL NO: ${billNumber} | ${new Date().toLocaleDateString('en-IN')}\n--------------------------------\n` + LEFT + SIZE_L;
+
+            if (mode === 'DISC') {
+                const max = Math.max(tagItems.length, discItems.length);
+                for(let i=0; i<max; i++) { 
+                    // Pad index to 2 spaces, and values to 5 spaces
+                    let idx = String(i+1).padStart(2, ' ');
+                    let tVal = String(tagItems[i] || 0).padStart(5, ' ');
+                    let dVal = String(discItems[i] || 0).padStart(5, ' ');
+                    text += `${idx}: ${tVal}-${dVal}\n`;
+                }
+                
+                let t1 = tagItems.reduce((a, b) => a + b, 0);
+                let t2 = discItems.reduce((a, b) => a + b, 0);
+                
+                text += SIZE_N + "--------------------------------\n" + SIZE_L;
+                
+                // Align the totals block under the numbers
+                let t1Pad = String(t1).padStart(5, ' ');
+                let t2Pad = String(t2).padStart(5, ' ');
+                text += `    ${t1Pad}-${t2Pad}\n`;
+                
+                // Print NET in words
+                text += `NET: ${numberToWords(t2)}\n`;
+                
+            } else {
+                tagItems.forEach((p, i) => { 
+                    let idx = String(i+1).padStart(2, ' ');
+                    let pVal = String(p).padStart(5, ' ');
+                    text += `${idx}: ${pVal}\n`; 
+                });
+                
+                let netTotal = tagItems.reduce((a, b) => a + b, 0);
+                let netTotalPad = String(netTotal).padStart(5, ' ');
+                
+                text += SIZE_N + "--------------------------------\n" + SIZE_L;
+                text += `    ${netTotalPad}\n`;
+                text += `NET: ${numberToWords(netTotal)}\n`;
             }
-            text += SIZE_N + "--------------------------------\n" + SIZE_L + `TOTAL: ${fSum}\n` + SIZE_N + CENTER + "--------------------------------\nNO RETURN NO EXCHANGE\nTHANK YOU VISIT AGAIN\n\n\n\n\n";
+
+            text += SIZE_N + CENTER + "--------------------------------\nNO RETURN NO EXCHANGE\nTHANK YOU VISIT AGAIN\n\n\n\n\n";
             const data = new TextEncoder().encode(text);
-            for (let i = 0; i < data.length; i += 20) await btCharacteristic.writeValue(data.slice(i, i + 20));
+            for (let i = 0; i < data.length; i += 20) { await btCharacteristic.writeValue(data.slice(i, i + 20)); }
             billNumber++; localStorage.setItem('shamgad_bill_no', billNumber);
-            discItems = []; updateUI();
+            clearAll();
         }
-        function copyHistory() { navigator.clipboard.writeText(document.documentElement.outerHTML).then(() => alert("Code Copied")); }
     </script>
 </body>
 </html>
+
+```
