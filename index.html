@@ -8,17 +8,14 @@
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
         html, body { position: fixed; top: 0; bottom: 0; left: 0; right: 0; margin: 0; padding: 0; background-color: #000; color: #fff; font-family: sans-serif; overflow: hidden; }
         body { display: flex; flex-direction: column; }
-        
         #display-container { flex: 1; padding: 8px; display: flex; flex-direction: column; border-bottom: 2px solid #333; min-height: 0; }
         .list-header { display: grid; grid-template-columns: 1fr 1fr; font-size: 0.75rem; color: #666; border-bottom: 1px solid #222; padding-bottom: 2px; }
         #items-area { flex: 1; overflow-y: auto; font-family: monospace; font-size: 1.1rem; margin-bottom: 5px; }
         .item-row { display: grid; grid-template-columns: 1fr 1fr; padding: 2px 0; border-bottom: 1px solid #111; }
         .tag-val { color: #888; text-align: left; }
         .disc-val { color: #fff; text-align: right; font-weight: bold; }
-        
         #live-summary { display: flex; justify-content: space-between; font-size: 0.9rem; color: #ff9f0a; padding: 4px 0; border-top: 1px solid #333; font-weight: bold; }
         #main-display { font-size: 3.2rem; font-weight: bold; color: #fff; text-align: right; line-height: 1; margin-top: 2px; }
-
         .grid { flex: 0 0 55%; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(5, 1fr); gap: 5px; padding: 6px; background: #000; }
         button { border: none; border-radius: 6px; font-size: 1.4rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         .num { background-color: #2c2c2e; color: #fff; }
@@ -31,7 +28,6 @@
         .btn-disc { background-color: #007aff; color: #fff; }
         #p-status { background-color: #ff3b30; color: #fff; border-radius: 50%; height: 42px; width: 42px; margin: auto; font-size: 0.8rem; }
         #p-status.connected { background-color: #34c759; }
-
         .popup-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); display: flex; align-items: center; justify-content: center; z-index: 1000; }
         .popup-content { background: #1c1c1e; padding: 25px; border-radius: 12px; text-align: center; width: 90%; max-width: 420px; border: 1px solid #333; }
         .salesman-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 15px; }
@@ -45,7 +41,15 @@
             <div id="salesman-grid" class="salesman-grid"></div>
         </div>
     </div>
-
+    <div id="payment-popup" class="popup-overlay" style="display: none;">
+        <div class="popup-content">
+            <h2 style="color: white;">Payment Received?</h2>
+            <div style="display:flex; gap:10px;">
+                <button style="flex:1; padding:15px;" onclick="finalizeBill()">YES</button>
+                <button style="flex:1; padding:15px;" onclick="document.getElementById('payment-popup').style.display='none'">NO</button>
+            </div>
+        </div>
+    </div>
     <div id="display-container">
         <div class="list-header"><span>TAG ITEMS</span><span style="text-align: right;">DISCOUNTED</span></div>
         <div id="items-area"></div>
@@ -55,9 +59,8 @@
         </div>
         <div id="main-display">0</div>
     </div>
-
     <div class="grid">
-        <button class="spec" onclick="clearAll()">AC</button>
+        <button class="spec" onclick="acButtonLogic()">AC</button>
         <button class="spec" onclick="backspace()">⌫</button>
         <button class="op" onclick="setOp('%')">%</button>
         <button class="op" onclick="setOp('*')">×</button>
@@ -77,93 +80,63 @@
         <button class="num" onclick="press('0')">0</button>
         <button class="eq" id="eq-btn" onclick="calculate()">=</button>
         <button class="btn-print btn-disc" onclick="requestSalesman('DISC')">DISC</button>
+        <button class="btn-print" onclick="copyHistory()">HIST</button>
     </div>
-
     <script>
         let currentInput = "", tagItems = [], discItems = [], isDiscPhase = false, lastOp = "+", btCharacteristic = null, pendingMode = null;
         let billNumber = parseInt(localStorage.getItem('shamgad_bill_no')) || 1;
-
         const staff = ["Rahul", "Suresh", "Rajesh", "Gulab", "Himakshi", "Mehak", "Other"];
         const grid = document.getElementById("salesman-grid");
         staff.forEach(name => {
-            let b = document.createElement("button");
-            b.className = "salesman-btn";
-            b.innerText = name;
-            b.onclick = () => finalizePrint(name);
-            grid.appendChild(b);
+            let b = document.createElement("button"); b.className = "salesman-btn"; b.innerText = name;
+            b.onclick = () => finalizePrint(name); grid.appendChild(b);
         });
-
         function updateUI() {
-            const area = document.getElementById('items-area');
-            area.innerHTML = "";
-            let tagSum = 0, discSum = 0;
+            const area = document.getElementById('items-area'); area.innerHTML = "";
+            let tS = 0, dS = 0;
             for(let i=0; i < Math.max(tagItems.length, discItems.length); i++) {
-                let tag = tagItems[i] || 0;
-                let disc = (discItems[i] !== undefined) ? discItems[i] : tag;
-                area.innerHTML += `<div class="item-row"><div class="tag-val">${tag}</div><div class="disc-val">${disc}</div></div>`;
-                tagSum += tag;
-                discSum += disc;
+                let t = tagItems[i] || 0, d = (discItems[i] !== undefined) ? discItems[i] : t;
+                area.innerHTML += `<div class="item-row"><div class="tag-val">${t}</div><div class="disc-val">${d}</div></div>`;
+                tS += t; dS += d;
             }
-            document.getElementById('screen-tag-total').innerText = "TAG: " + tagSum;
-            document.getElementById('screen-disc-total').innerText = "DISC: " + discSum;
+            document.getElementById('screen-tag-total').innerText = "TAG: " + tS;
+            document.getElementById('screen-disc-total').innerText = "DISC: " + dS;
         }
-
-        function press(num) { currentInput += num; document.getElementById('main-display').innerText = currentInput; }
+        function press(n) { currentInput += n; document.getElementById('main-display').innerText = currentInput; }
         function backspace() { currentInput = currentInput.slice(0, -1); document.getElementById('main-display').innerText = currentInput || "0"; }
-        
         function processMath() {
             if (currentInput === "") return;
-            let val = parseFloat(currentInput);
-            if (isDiscPhase) {
-                let lastTag = tagItems[discItems.length] || 0;
-                discItems.push(lastOp === '%' ? Math.round(lastTag - (lastTag * (val/100))) : val);
-            } else { tagItems.push(val); }
+            let v = parseFloat(currentInput);
+            if (isDiscPhase) { let t = tagItems[discItems.length] || 0; discItems.push(lastOp === '%' ? Math.round(t - (t * (v/100))) : v); } 
+            else tagItems.push(v);
             currentInput = "";
         }
-
         function setOp(op) { processMath(); lastOp = op; updateUI(); document.getElementById('main-display').innerText = "0"; }
         function calculate() { processMath(); updateUI(); lastOp = "+"; document.getElementById('main-display').innerText = "0"; if(!isDiscPhase && tagItems.length > 0) { isDiscPhase = true; document.getElementById('eq-btn').classList.add('saved'); } }
+        function acButtonLogic() { if(tagItems.length > 0) document.getElementById('payment-popup').style.display = 'flex'; else clearAll(); }
+        function finalizeBill() { clearAll(); document.getElementById('payment-popup').style.display = 'none'; }
         function clearAll() { currentInput = ""; tagItems = []; discItems = []; isDiscPhase = false; document.getElementById('main-display').innerText = "0"; document.getElementById('eq-btn').classList.remove('saved'); updateUI(); }
-        function requestSalesman(mode) { pendingMode = mode; document.getElementById("salesman-popup").style.display = "flex"; }
-
-        async function connectBT() {
-            try {
-                const device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb'] });
-                const server = await device.gatt.connect();
-                const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
-                const chars = await service.getCharacteristics();
-                btCharacteristic = chars.find(c => c.properties.write || c.properties.writeWithoutResponse);
-                if (btCharacteristic) document.getElementById('p-status').classList.add('connected');
-            } catch (e) { alert(e.message); }
-        }
-
+        function requestSalesman(m) { pendingMode = m; document.getElementById("salesman-popup").style.display = "flex"; }
+        async function connectBT() { try { const d = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb'] }); const s = await d.gatt.connect(); const c = await s.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb').then(srv => srv.getCharacteristics()); btCharacteristic = c.find(ch => ch.properties.write || ch.properties.writeWithoutResponse); if(btCharacteristic) document.getElementById('p-status').classList.add('connected'); } catch(e) { alert(e.message); } }
         async function finalizePrint(salesman) {
             document.getElementById("salesman-popup").style.display = "none";
             if (currentInput !== "") calculate();
             if (!btCharacteristic) { alert("Connect Printer"); return; }
             const ESC = '\x1B', GS = '\x1D', CENTER = ESC + 'a' + '\x01', LEFT = ESC + 'a' + '\x00', SIZE_L = GS + '!' + '\x11', SIZE_N = GS + '!' + '\x00';
-            
             const now = new Date();
-            const dateStr = now.toLocaleDateString('en-IN');
-            const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-
-            let text = CENTER + SIZE_L + "SHAMGAD VAALE\nBAJAJ\n" + SIZE_N + `BILL NO: ${billNumber}\n${dateStr} ${timeStr}\nATTENDED BY: ${salesman}\n--------------------------------\n` + LEFT + SIZE_L;
-
-            let finalDiscSum = 0;
+            let text = CENTER + SIZE_L + "SHAMGAD VAALE\nBAJAJ\n" + SIZE_N + `BILL NO: ${billNumber}\n${now.toLocaleDateString('en-IN')} ${now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}\nATTENDED BY: ${salesman}\n--------------------------------\n` + LEFT + SIZE_L;
+            let fSum = 0;
             for(let i=0; i<tagItems.length; i++) {
                 let d = (discItems[i] !== undefined) ? discItems[i] : tagItems[i];
-                text += `${tagItems[i]} - ${d}\n`;
-                finalDiscSum += d;
+                text += `${tagItems[i]} - ${d}\n`; fSum += d;
             }
-            text += SIZE_N + "--------------------------------\n" + SIZE_L + `TOTAL: ${finalDiscSum}\n` + SIZE_N + CENTER + "--------------------------------\nNO RETURN NO EXCHANGE\nTHANK YOU VISIT AGAIN\n\n\n\n\n";
-            
+            text += SIZE_N + "--------------------------------\n" + SIZE_L + `TOTAL: ${fSum}\n` + SIZE_N + CENTER + "--------------------------------\nNO RETURN NO EXCHANGE\nTHANK YOU VISIT AGAIN\n\n\n\n\n";
             const data = new TextEncoder().encode(text);
             for (let i = 0; i < data.length; i += 20) await btCharacteristic.writeValue(data.slice(i, i + 20));
-            
             billNumber++; localStorage.setItem('shamgad_bill_no', billNumber);
-            discItems = [];
-            updateUI();
+            discItems = []; updateUI();
         }
+        function copyHistory() { navigator.clipboard.writeText(document.documentElement.outerHTML).then(() => alert("Code Copied")); }
     </script>
 </body>
 </html>
