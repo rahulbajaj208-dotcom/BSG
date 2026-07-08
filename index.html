@@ -32,7 +32,6 @@
         #p-status { background-color: #ff3b30; color: #fff; border-radius: 50%; height: 42px; width: 42px; margin: auto; font-size: 0.8rem; }
         #p-status.connected { background-color: #34c759; }
 
-        /* Popup Styles */
         .popup-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); display: flex; align-items: center; justify-content: center; z-index: 1000; }
         .popup-content { background: #1c1c1e; padding: 25px; border-radius: 12px; text-align: center; width: 90%; max-width: 420px; border: 1px solid #333; }
         .salesman-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 15px; }
@@ -42,7 +41,7 @@
 <body>
     <div id="salesman-popup" class="popup-overlay" style="display: none;">
         <div class="popup-content">
-            <h2 style="margin-top: 0;">ATTENDED BY</h2>
+            <h2 style="margin-top: 0; color: white;">ATTENDED BY</h2>
             <div id="salesman-grid" class="salesman-grid"></div>
         </div>
     </div>
@@ -81,9 +80,8 @@
     </div>
 
     <script>
-        let currentInput = "", tagItems = [], discItems = [], isDiscPhase = false, lastOp = "+", btCharacteristic = null;
+        let currentInput = "", tagItems = [], discItems = [], isDiscPhase = false, lastOp = "+", btCharacteristic = null, pendingMode = null;
         let billNumber = parseInt(localStorage.getItem('shamgad_bill_no')) || 1;
-        let pendingMode = null;
 
         const staff = ["Rahul", "Suresh", "Rajesh", "Gulab", "Himakshi", "Mehak", "Other"];
         const grid = document.getElementById("salesman-grid");
@@ -95,31 +93,19 @@
             grid.appendChild(b);
         });
 
-        function numberToWords(num) {
-            const a = ['','ONE ','TWO ','THREE ','FOUR ', 'FIVE ','SIX ','SEVEN ','EIGHT ','NINE ','TEN ','ELEVEN ','TWELVE ','THIRTEEN ','FOURTEEN ','FIFTEEN ','SIXTEEN ','SEVENTEEN ','EIGHTEEN ','NINETEEN '];
-            const b = ['', '', 'TWENTY ','THIRTY ','FORTY ','FIFTY ', 'SIXTY ','SEVENTY ','EIGHTY ','NINETY '];
-            if (num === 0) return 'ZERO ONLY';
-            if (num > 99999) return num.toString();
-            let str = '';
-            if (Math.floor(num / 1000) > 0) {
-                let thousands = Math.floor(num / 1000);
-                str += (thousands < 20) ? a[thousands] : b[Math.floor(thousands / 10)] + a[thousands % 10];
-                str += 'THOUSAND ';
-                num %= 1000;
-            }
-            if (Math.floor(num / 100) > 0) { str += a[Math.floor(num / 100)] + 'HUNDRED '; num %= 100; }
-            if (num > 0) { str += (num < 20) ? a[num] : b[Math.floor(num / 10)] + a[num % 10]; }
-            return str.trim() + ' ONLY';
-        }
-
         function updateUI() {
             const area = document.getElementById('items-area');
             area.innerHTML = "";
+            let tagSum = 0, discSum = 0;
             for(let i=0; i < Math.max(tagItems.length, discItems.length); i++) {
-                area.innerHTML += `<div class="item-row"><div class="tag-val">${tagItems[i]||''}</div><div class="disc-val">${discItems[i]||''}</div></div>`;
+                let tag = tagItems[i] || 0;
+                let disc = (discItems[i] !== undefined) ? discItems[i] : tag;
+                area.innerHTML += `<div class="item-row"><div class="tag-val">${tag}</div><div class="disc-val">${disc}</div></div>`;
+                tagSum += tag;
+                discSum += disc;
             }
-            document.getElementById('screen-tag-total').innerText = "TAG: " + tagItems.reduce((a, b) => a + b, 0);
-            document.getElementById('screen-disc-total').innerText = "DISC: " + discItems.reduce((a, b) => a + b, 0);
+            document.getElementById('screen-tag-total').innerText = "TAG: " + tagSum;
+            document.getElementById('screen-disc-total').innerText = "DISC: " + discSum;
         }
 
         function press(num) { currentInput += num; document.getElementById('main-display').innerText = currentInput; }
@@ -128,15 +114,16 @@
         function processMath() {
             if (currentInput === "") return;
             let val = parseFloat(currentInput);
-            if (isDiscPhase) discItems.push(lastOp === '%' ? Math.round((tagItems[discItems.length] || 0) * (val/100)) : val);
-            else tagItems.push(val);
+            if (isDiscPhase) {
+                let lastTag = tagItems[discItems.length] || 0;
+                discItems.push(lastOp === '%' ? Math.round(lastTag - (lastTag * (val/100))) : val);
+            } else { tagItems.push(val); }
             currentInput = "";
         }
 
         function setOp(op) { processMath(); lastOp = op; updateUI(); document.getElementById('main-display').innerText = "0"; }
         function calculate() { processMath(); updateUI(); lastOp = "+"; document.getElementById('main-display').innerText = "0"; if(!isDiscPhase && tagItems.length > 0) { isDiscPhase = true; document.getElementById('eq-btn').classList.add('saved'); } }
         function clearAll() { currentInput = ""; tagItems = []; discItems = []; isDiscPhase = false; document.getElementById('main-display').innerText = "0"; document.getElementById('eq-btn').classList.remove('saved'); updateUI(); }
-        
         function requestSalesman(mode) { pendingMode = mode; document.getElementById("salesman-popup").style.display = "flex"; }
 
         async function connectBT() {
@@ -155,21 +142,26 @@
             if (currentInput !== "") calculate();
             if (!btCharacteristic) { alert("Connect Printer"); return; }
             const ESC = '\x1B', GS = '\x1D', CENTER = ESC + 'a' + '\x01', LEFT = ESC + 'a' + '\x00', SIZE_L = GS + '!' + '\x11', SIZE_N = GS + '!' + '\x00';
-            let text = CENTER + SIZE_L + "SHAMGAD VAALE\nBAJAJ\n" + SIZE_N + `BILL NO: ${billNumber} | ${new Date().toLocaleDateString('en-IN')}\nATTENDED BY: ${salesman}\n--------------------------------\n` + LEFT + SIZE_L;
+            
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('en-IN');
+            const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
-            if (pendingMode === 'DISC') {
-                for(let i=0; i<Math.max(tagItems.length, discItems.length); i++) text += `${String(i+1).padStart(2, ' ')}: ${String(tagItems[i]||0).padStart(5, ' ')}-${String(discItems[i]||0).padStart(5, ' ')}\n`;
-                text += SIZE_N + "--------------------------------\n" + SIZE_L + `TOTAL: ${tagItems.reduce((a,b)=>a+b,0)} - ${discItems.reduce((a,b)=>a+b,0)}\nNET: ${numberToWords(discItems.reduce((a,b)=>a+b,0))}\n`;
-            } else {
-                tagItems.forEach((p, i) => text += `${String(i+1).padStart(2, ' ')}: ${String(p).padStart(5, ' ')}\n`);
-                text += SIZE_N + "--------------------------------\n" + SIZE_L + `TOTAL: ${tagItems.reduce((a,b)=>a+b,0)}\nNET: ${numberToWords(tagItems.reduce((a,b)=>a+b,0))}\n`;
+            let text = CENTER + SIZE_L + "SHAMGAD VAALE\nBAJAJ\n" + SIZE_N + `BILL NO: ${billNumber}\n${dateStr} ${timeStr}\nATTENDED BY: ${salesman}\n--------------------------------\n` + LEFT + SIZE_L;
+
+            let finalDiscSum = 0;
+            for(let i=0; i<tagItems.length; i++) {
+                let d = (discItems[i] !== undefined) ? discItems[i] : tagItems[i];
+                text += `${tagItems[i]} - ${d}\n`;
+                finalDiscSum += d;
             }
-            text += SIZE_N + CENTER + "--------------------------------\nNO RETURN NO EXCHANGE\nTHANK YOU VISIT AGAIN\n\n\n\n\n";
+            text += SIZE_N + "--------------------------------\n" + SIZE_L + `TOTAL: ${finalDiscSum}\n` + SIZE_N + CENTER + "--------------------------------\nNO RETURN NO EXCHANGE\nTHANK YOU VISIT AGAIN\n\n\n\n\n";
+            
             const data = new TextEncoder().encode(text);
             for (let i = 0; i < data.length; i += 20) await btCharacteristic.writeValue(data.slice(i, i + 20));
             
             billNumber++; localStorage.setItem('shamgad_bill_no', billNumber);
-            discItems = []; // Clear only discount section
+            discItems = [];
             updateUI();
         }
     </script>
